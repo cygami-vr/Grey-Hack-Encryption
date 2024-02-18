@@ -65,4 +65,4 @@ Using these, constructor your keypairs as such. Each number should be in a strin
 # Roadmap
 1. Consider implementing ECDSA encryption.
 2. Optimize further to make 1024 bit keys practical. Currently I am unsure of further ways to optimize the code.
-          i. Probably the biggest opportunity is to reduce array allocations and calls to `list.add` and `list.remove`.
+        1. Probably the biggest opportunity is to reduce array allocations and calls to `list.add` and `list.remove`.
