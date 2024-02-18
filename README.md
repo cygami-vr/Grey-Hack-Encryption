@@ -57,7 +57,7 @@ In addition to these, you will need to compute the following:
 10. `qShift = ceil(log2(q)) * 2`
 11. `qFactor = (1 << qShift) / q`
 
-Using these, constructor your keypairs as follows. Each number should be in a string hexadecimal representation such as `"0xabc123"`.
+Using these, construct your keypairs as follows. Each number should be in a string hexadecimal representation such as `"0xabc123"`.
                 
         publicKey = PublicKey.newKey(e, n, bitLen, rrm, blockSize)
         privateKey = PrivateKey.newKey(d, n, p, q, qModInvP, dp, dq, pShift, pFactor, qShift, qFactor)
