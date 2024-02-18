@@ -58,10 +58,11 @@ In addition to these, you will need to compute the following:
 11. `qFactor = (1 << qShift) / q`
 
 Using these, constructor your keypairs as such. Each number should be in a string hexadecimal representation such as `0xabc123`.
-`publicKey = PublicKey.newKey(e, n, bitLen, rrm, blockSize)`
-`privateKey = PrivateKey.newKey(d, n, p, q, qModInvP, dp, dq, pShift, pFactor, qShift, qFactor)`
+                
+        publicKey = PublicKey.newKey(e, n, bitLen, rrm, blockSize)
+        privateKey = PrivateKey.newKey(d, n, p, q, qModInvP, dp, dq, pShift, pFactor, qShift, qFactor)
 
 # Roadmap
 1. Consider implementing ECDSA encryption.
 2. Optimize further to make 1024 bit keys practical. Currently I am unsure of further ways to optimize the code.
-  i. Probably the biggest opportunity is to reduce array allocations and calls to `list.add` and `list.remove`.
+          i. Probably the biggest opportunity is to reduce array allocations and calls to `list.add` and `list.remove`.
