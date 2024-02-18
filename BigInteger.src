@@ -1,0 +1,484 @@
+// Takes a hex character from "0" to "f"
+// And converts it to a number from 0 to 15
+string.hexCode = function
+	if self.len == 0 then return ""
+	c = code(self[0])
+	if c >= 97 then
+		return c - 87
+	else
+		return c - 48
+	end if	
+end function
+
+// Takes a number from 0 to 15
+// And converts it to a character from "0" to "f"
+number.hexChar = function
+	c = self
+	if c > 9 then
+		c = c + 87
+	else
+		c = c + 48
+	end if
+	return char(c)
+end function
+
+// Takes any character
+// And returns a hex value from "00" to "ff" that represents the char code
+string.hexStr = function
+	c = code(self)
+	a = floor(c / 16)
+	b = c % 16
+	return a.hexChar + b.hexChar
+end function
+
+// Takes a 2 char string from "00" to "ff"
+// And returns the character that that hex value represents
+string.hexChar = function
+	c = self.hexCode
+	if self.len == 2 then c = 16 * c + self[1].hexCode
+	return char(c)
+end function
+
+BigInteger = {}
+
+BigInteger.WORD_SIZE_BITS = 24
+BigInteger.WORD_SIZE_HEX = BigInteger.WORD_SIZE_BITS / 4
+BigInteger.WORD_MASK = 2 ^ BigInteger.WORD_SIZE_BITS - 1
+
+BigInteger.New = function
+	ret = new BigInteger
+	ret.words = []
+	return ret
+end function
+
+BigInteger.fromHexString = function(val)
+	
+	if val[:2] == "0x" then val = val[2:]
+	ret = BigInteger.New
+	
+	for i in range(val.len, 1, -BigInteger.WORD_SIZE_HEX)
+		
+		idx = i - BigInteger.WORD_SIZE_HEX
+		if idx < 0 then idx = 0
+		hexWord = val[idx:i]
+		
+		wordInt = 0
+		for j in range(0, hexWord.len - 1)
+			
+			shAmt = 4 * (hexWord.len - j - 1)
+			hexInt = bitwise("<<", hexWord[j].hexCode, shAmt)
+			wordInt = bitwise("|", wordInt, hexInt)
+			
+		end for
+		
+		ret.words.push(wordInt)
+	end for
+	
+	return ret
+end function
+
+BigInteger.toHexString = function
+	
+	hex = ""
+	for i in range(self.words.len - 1, 0, -1)
+		
+		for j in range(BigInteger.WORD_SIZE_HEX - 1, 0, -1)
+			
+			c = bitwise("&", bitwise(">>", self.words[i], j * 4), 15).hexChar
+			hex = hex + c
+		end for
+	end for
+	
+	hex = hex.replace("^0+", "")
+	if hex.len == 0 then hex = "0"
+	return "0x" + hex
+end function
+
+BigInteger.trim = function
+	while self.words.len > 1 and self.words[-1] == 0
+		self.words.remove(-1)
+	end while
+	return self
+end function
+
+BigInteger.fromInt = function(n)
+	ret = BigInteger.New
+	// Currently only two words at most are ever needed from the input integer
+	ret.words.push(bitwise("&", n, BigInteger.WORD_MASK))
+	ret.words.push(bitwise("&", bitwise(">>", n, BigInteger.WORD_SIZE_BITS), BigInteger.WORD_MASK))
+	return ret.trim
+end function
+
+BigInteger.copy = function
+	ret = BigInteger.New
+	for i in range(0, self.words.len - 1)
+		ret.words.push(self.words[i])
+	end for
+	return ret
+end function
+
+BigInteger.ZERO = BigInteger.fromInt(0)
+BigInteger.ONE = BigInteger.fromInt(1)
+BigInteger.TWO = BigInteger.fromInt(2)
+
+BigInteger.isEven = function
+	return self.words[0] % 2 == 0
+end function
+
+BigInteger.isOdd = function
+	return self.words[0] % 2 == 1
+end function
+
+BigInteger.maxWords = function(other)
+	if self.words.len >= other.words.len then return self.words.len
+	return other.words.len
+end function
+
+BigInteger.itMaxLtB = function(other)
+	words = self.maxWords(other)
+	return range(0, words - 1)
+end function
+
+BigInteger.getWordOr = function(idx, default)
+	if idx >= self.words.len then return default
+	return self.words[idx]
+end function
+
+BigInteger.bitLen = function
+	i = self.words.len - 1
+	len = i * BigInteger.WORD_SIZE_BITS
+	finalWord = BigInteger.fromInt(self.words[i]).toHexString.len * 4
+	return len + finalWord
+end function
+
+// Warning: While this does not mutate the value, it can break some functions, like compareTo.
+BigInteger.ensureWordCapacity = function(words)
+	while self.words.len < words
+		self.words.push(0)
+	end while
+end function
+
+// Warning: This mutates the value.
+BigInteger.shiftWords = function(shAmt)
+	for i in range(1, shAmt)
+		self.words.insert(0, 0)
+	end for
+end function
+
+BigInteger.subWords = function(from, to)
+	ret = BigInteger.New
+	ret.words = self.words[from:to]
+	return ret
+end function
+
+// -1 = self is less than other
+// 0 = equal (duh!)
+// 1 = self is greater than other
+BigInteger.compareTo = function(other)
+
+	if self.words.len < other.words.len then
+		return -1
+	else if self.words.len > other.words.len then
+		return 1
+	end if
+	
+	for i in range(self.words.len - 1, 0, -1)
+		if self.words[i] < other.words[i] then
+			return -1
+		else if self.words[i] > other.words[i] then
+			return 1
+		end if
+	end for
+	
+	return 0
+end function
+
+BigInteger.shiftRight = function(shAmt)
+
+	ret = BigInteger.New
+	off = floor(shAmt / BigInteger.WORD_SIZE_BITS)
+	if off >= self.words.len then return BigInteger.ZERO
+	shAmt = shAmt % BigInteger.WORD_SIZE_BITS
+	
+	ret.words.push(bitwise(">>", self.words[-1], shAmt))
+	
+	for i in range(self.words.len - 2, off, -1)
+	
+		toShift = bitwise("|", bitwise("<<", self.words[i + 1], BigInteger.WORD_SIZE_BITS), self.words[i])
+		shifted = bitwise("&", bitwise(">>", toShift, shAmt), BigInteger.WORD_MASK)
+		ret.words.insert(0, shifted)
+	end for
+	
+	return ret.trim
+end function
+
+// This is currently unused
+BigInteger.shiftLeft = function(shAmt)
+
+	ret = BigInteger.New
+	trailingWords = floor(shAmt / BigInteger.WORD_SIZE_BITS)
+	shAmt = shAmt % BigInteger.WORD_SIZE_BITS
+	
+	// should be able to combine these two shifts into one
+	largest = bitwise("<<", self.words[-1], shAmt)
+	ret.words.push(bitwise(">>", largest, BigInteger.WORD_SIZE_BITS))
+
+	if self.words.len > 2 then
+		for i in range(self.words.len - 2, 0)
+			
+			toShift = bitwise("|", bitwise("<<", self.words[i + 1], BigInteger.WORD_SIZE_BITS), self.words[i])
+			
+			// should be able to combine these two shifts into one
+			shifted = bitwise("<<", toShift, shAmt)
+			shifted = bitwise(">>", shifted, BigInteger.WORD_SIZE_BITS)
+			
+			shifted = bitwise("&", shifted, BigInteger.WORD_MASK)
+			ret.words.insert(0, shifted)
+		end for
+	end if
+	
+	if self.words.len > 1 then
+		smallest = bitwise("<<", self.words[0], shAmt)
+		ret.words.insert(0, bitwise("&", smallest, BigInteger.WORD_MASK))
+	end if
+	
+	ret.shiftWords(trailingWords)
+	
+	return ret.trim
+end function
+
+BigInteger.add = function(other)
+	
+	ret = BigInteger.New
+	carry = 0
+	
+	for i in self.itMaxLtB(other)
+		
+		selfWord = self.getWordOr(i, 0)
+		otherWord = other.getWordOr(i, 0)
+		result = selfWord + otherWord + carry
+		carry = bitwise(">>", result, BigInteger.WORD_SIZE_BITS)
+		result = bitwise("&", result, BigInteger.WORD_MASK)
+		
+		ret.words.push(result)
+	end for
+	
+	if carry != 0 then ret.words.push(carry)
+	
+	return ret.trim
+end function
+
+// Optimized version of add that does not need to create a new array
+// And can also leave words to the left of the provided offset as their original value
+BigInteger.mutateAddWithOffset = function(other, off)
+	
+	carry = 0
+	words = other.words.len + off
+	if self.words.len > words then words = self.words.len
+	
+	for i in range(off, words - 1)
+		
+		selfWord = self.getWordOr(i, 0)
+		otherWord = other.getWordOr(i - off, 0)
+		result = selfWord + otherWord + carry
+		carry = bitwise(">>", result, BigInteger.WORD_SIZE_BITS)
+		result = bitwise("&", result, BigInteger.WORD_MASK)
+		
+		if self.words.len > i then
+			self.words[i] = result
+		else
+			self.words.push(result)
+		end if
+		
+	end for
+	
+	if carry != 0 then self.words.push(carry)
+	
+	return self.trim
+end function
+
+BigInteger.subtract = function(other)
+	
+	ret = BigInteger.New
+	carry = 0
+	
+	for i in self.itMaxLtB(other)
+		
+		selfWord = self.getWordOr(i, 0)
+		otherWord = other.getWordOr(i, 0)
+		result = selfWord - otherWord + carry
+		carry = bitwise(">>", result, BigInteger.WORD_SIZE_BITS)
+		result = bitwise("&", result, BigInteger.WORD_MASK)
+		
+		ret.words.push(result)
+	end for
+	
+	if carry != 0 then ret.words.push(carry)
+	
+	return ret.trim
+end function
+
+BigInteger.naiveMultiply = function(other)
+	
+	ret = BigInteger.ZERO.copy
+	carry = 0
+	
+	for i in range(0, self.words.len - 1)
+		
+		selfWord = self.words[i]
+		partialResult = BigInteger.New
+		partialResult.words = []
+		
+		for j in range(0, other.words.len - 1)
+		
+			otherWord = other.words[j]
+			result = selfWord * otherWord + carry
+			
+			carry = bitwise(">>", result, BigInteger.WORD_SIZE_BITS)
+			result = bitwise("&", result, BigInteger.WORD_MASK)
+			
+			partialResult.words.push(result)
+		end for
+		
+		if carry != 0 then
+			partialResult.words.push(carry)
+			carry = 0
+		end if
+
+		ret.mutateAddWithOffset(partialResult, i)
+	end for
+
+	return ret
+end function
+
+BigInteger.karatsuba = function(other)
+
+	A = null
+	B = null
+	len = null
+
+	if self.words.len > other.words.len then
+		B = self
+		A = other
+		len = self.words.len
+	else
+		B = other
+		A = self
+		len = other.words.len
+	end if
+	
+	A.ensureWordCapacity(len)
+	
+	if len % 2 == 1 then
+		len = len + 1
+		A.words.push(0)
+		B.words.push(0)
+	end if
+	
+	mIdx = len / 2
+	
+	Al = A.subWords(mIdx, len).trim
+	Ar = A.subWords(0, mIdx)
+	Bl = B.subWords(mIdx, len).trim
+	Br = B.subWords(0, mIdx)
+	
+	p = Al.multiply(Bl)
+	q = Ar.multiply(Br)
+	
+	r = Al.add(Ar).multiply(Bl.add(Br)).subtract(p.add(q))
+	
+	p.shiftWords(len)
+	r.shiftWords(len / 2)
+	final = q.add(r).add(p)
+	
+	A.trim
+	B.trim
+	return final
+
+end function
+
+BigInteger.multiply = function(other)
+
+	// In theory it should be faster to use the Karatsuba algorithm past a certain threshold.
+	// In practice, I have yet to see this happen.
+	// The largest test I have done is a 978 bit key.
+	
+	return self.naiveMultiply(other)
+end function
+
+BigInteger.barrettReduction = function(modulus, shift, factor)
+
+	t = self.subtract(self.multiply(factor).shiftRight(shift).multiply(modulus))
+	
+	if t.compareTo(modulus) < 0 then
+		return t
+	end if
+	
+	t = t.subtract(modulus)
+	return t
+	
+end function
+
+BigInteger.montgomeryReduce = function(bitLen, n)
+
+	result = self
+	
+	for i in range(0, bitLen - 1)
+		if result.isOdd then
+			result = result.add(n)
+		end if
+		result = result.shiftRight(1)
+	end for
+	
+	if result.compareTo(n) >= 0 then
+		result = result.subtract(n)
+	end if
+	
+	return result
+end function
+
+BigInteger.montgomeryReduction = function(modulus, exponent, bitLen, rrm)
+
+	result = rrm.montgomeryReduce(bitLen, modulus)
+	base = self.multiply(rrm).montgomeryReduce(bitLen, modulus)
+
+    while exponent.compareTo(BigInteger.ZERO) == 1
+        if exponent.isOdd then
+            result = result.multiply(base).montgomeryReduce(bitLen, modulus)
+		end if
+
+        exponent = exponent.shiftRight(1)
+        base = base.multiply(base).montgomeryReduce(bitLen, modulus)
+	end while
+
+	result = result.montgomeryReduce(bitLen, modulus)
+    return result
+	
+end function
+
+BigInteger.modularExponentiation = function(exponent, modulus, shift, factor)
+
+	result = BigInteger.ONE
+	base = self.barrettReduction(modulus, shift, factor)
+
+    while exponent.compareTo(BigInteger.ZERO) == 1
+        if exponent.isOdd then
+            result = result.multiply(base).barrettReduction(modulus, shift, factor)
+		end if
+
+        exponent = exponent.shiftRight(1)
+        base = base.multiply(base).barrettReduction(modulus, shift, factor)
+		
+	end while
+
+    return result
+end function
+
+BigInteger.chineseRemainderTheorem = function(dp, p, pShift, pFactor, dq, q, qShift, qFactor, pqModInv)
+
+	mp = self.modularExponentiation(dp, p, pShift, pFactor)
+	mq = self.modularExponentiation(dq, q, qShift, qFactor)
+	h = pqModInv.multiply(mp.subtract(mq)).barrettReduction(p, pShift, pFactor)
+	
+	return mq.add(h.multiply(q))
+end function

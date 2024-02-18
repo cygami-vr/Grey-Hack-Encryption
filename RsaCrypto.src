@@ -1,0 +1,124 @@
+Key = {}
+
+PublicKey = new Key
+PublicKey.newKey = function(e, n, bitLen, rrm, blockSize)
+	key = new PublicKey
+	key.e = BigInteger.fromHexString(e)
+	key.n = BigInteger.fromHexString(n)
+	key.blockSize = blockSize
+
+	// Montgomery reduction constants
+	// bitLen = bit length of n
+	key.bitLen = bitLen
+	// rrm = 1 << (bitLen * 2) % n
+	key.rrm = BigInteger.fromHexString(rrm)
+
+	return key
+end function
+
+PublicKey.encode = function(input)
+	return BigInteger.fromHexString(input).montgomeryReduction(self.n, self.e, self.bitLen, self.rrm).toHexString
+end function
+
+PrivateKey = new Key
+PrivateKey.newKey = function(d, n, p, q, pqModInv, dp, dq, pShift, pFactor, qShift, qFactor)
+	key = new PrivateKey
+	key.d = BigInteger.fromHexString(d)
+	key.n = BigInteger.fromHexString(n)
+	key.p = BigInteger.fromHexString(p)
+	key.q = BigInteger.fromHexString(q)
+	
+	// Chinese remainder theorem constants
+	// pqModInv = q^(-1) (mod m)
+	key.pqModInv = BigInteger.fromHexString(pqModInv)
+	// dp = d % (p - 1)
+	key.dp = BigInteger.fromHexString(dp)
+	// dq = d % (q - 1)
+	key.dq = BigInteger.fromHexString(dq)
+	
+	// Barrett reduction constants
+	// pShift = bit length of p * 2
+	key.pShift = pShift
+	// pFactor = (1 << pShift) / p
+	key.pFactor = BigInteger.fromHexString(pFactor)
+	// qShift = bit length of q * 2
+	key.qShift = qShift
+	// qFactor = (1 << qShift) / q
+	key.qFactor = BigInteger.fromHexString(qFactor)
+	return key
+end function
+
+PrivateKey.decode = function(input)
+
+	return BigInteger.fromHexString(input).chineseRemainderTheorem(self.dp, self.p, self.pShift, self.pFactor, self.dq, self.q, self.qShift, self.qFactor, self.pqModInv).toHexString
+	
+end function
+
+RsaEncode = function(cleartext, publicKey)
+
+	blocks = splitIntoBlocks(cleartext, publicKey.blockSize)
+
+	for i in range(0, blocks.len - 1)
+		blocks[i] = publicKey.encode(blocks[i])
+	end for
+	
+	return blocks.join(",")
+end function
+
+splitIntoBlocks = function(cleartext, blockSize)
+
+	blocks = []
+	
+	for i in range(0, cleartext.len - 1, blockSize)
+	
+		toAdd = cleartext[i:(i + blockSize)]
+		block = "0x"
+		
+		for c in toAdd
+			code = c.hexStr
+			
+			if code.len == 1 then
+				code = "0" + code
+			end if
+			
+			block = block + code
+		end for
+		
+		blocks.push(block)
+	end for
+	
+	return blocks
+end function
+
+RsaDecode = function(encoded, privateKey)
+
+	blocks = encoded.split(",")
+	
+	for i in range(0, blocks.len - 1)
+		blocks[i] = privateKey.decode(blocks[i])
+	end for
+	
+	for i in range(0, blocks.len - 1)
+		blocks[i] = convertToString(blocks[i])
+	end for
+	
+	return blocks.join("")
+end function
+
+convertToString = function(toPrep)
+	toPrep = toPrep[2:]
+
+	// Leading zeroes were lost during encode
+	if toPrep.len % 2 == 1 then
+		toPrep = "0" + toPrep
+	end if
+	
+	// Grab each group of 2 digits and convert it to a character
+	prepped = ""
+	for i in range(0, toPrep.len - 1, 2)
+		code = toPrep[i:(i + 2)]
+		prepped = prepped + code.hexChar
+	end for
+	
+	return prepped
+end function
