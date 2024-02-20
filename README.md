@@ -47,7 +47,7 @@ This guide will **not** cover how to generate a secure `p` and `q` values.
 In addition to these, you will need to compute the following:
 1. `n = p * q`
 2. `bitLen = ceil(log2(n))`
-3. `blockSize = bitLen / 8`
+3. `blockSize = floor(bitLen / 8)`
 4. `rrm = (1 << (bitLen * 2)) % n`
 5. `qModInvP = q^(-1) (mod p)`
 6. `dp = d % (p - 1)`
