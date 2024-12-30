@@ -9,7 +9,7 @@ However, it still offers security far higher than that of the out-of-box Caesar 
 If real-life comparable security is important to you in Grey Hack, this code _will_ work with 1024 bit keys, but the encrypt/decrypt process will take ~2 minutes.
 
 # How to use this
-1. Generate a keypair
+1. Download GenerateRSAKeypairForGreyHack.jar and run it from the command line like: `java -jar GenerateRSAKeypairForGreyHack.jar 512` where 512 is the number of bits you'd like. You can swap for 256 if you want quicker logins or 1024 if you want realistic (maybe) security.
 2. In Grey Hack, open CodeEditor.exe.
 3. Paste in both BigInteger.src and RsaCrypto.src
 4. Add the following at the bottom with your public key populated:
@@ -34,35 +34,15 @@ If real-life comparable security is important to you in Grey Hack, this code _wi
 10. Don't forget to enable encryption in `/server/conf/sshd.conf`
 11. Test that it is working properly **in a separate terminal** before disconnecting your current session. If you disconnect, and there is a problem, you may be unable to access your server via SSH.
 
-## How to generate your keypair
+# Optional optimization via password hardcoding
+You can optionally hardcode a check for the correct encoded password in the `decode.bin`, allowing full bypass of decryption. This makes the login much faster, since the decryption takes much longer than the encryption.
+With this method, use of 1024 bit keys is manageable with a log-in time of around 36 seconds.
+This optimization is possible for two reasons.
+1. Since Grey Hack _only_ uses encryption for the password, we can know what the single correct encoded value should look like.
+2. The hardcoded checks are only needed in the `decode.bin`, which is not open source like `encode.src`.
 
-For optimization, this code uses a few precomputed constants. This project does **not** include a key generator.
-To start, I will assume you have the typical RSA keypair constants already generated.
-This includes:
-1. Prime numbers `p` and `q`
-2. Public key exponent `e`
-3. Private key exponent `d`
-
-This guide will **not** cover how to generate a secure `p` and `q` values.
-In addition to these, you will need to compute the following:
-1. `n = p * q`
-2. `bitLen = ceil(log2(n))`
-3. `blockSize = floor(bitLen / 8)`
-4. `rrm = (1 << (bitLen * 2)) % n`
-5. `qModInvP = q^(-1) (mod p)`
-6. `dp = d % (p - 1)`
-7. `dq = d % (q - 1)`
-8. `pShift = ceil(log2(p)) * 2`
-9. `pFactor = (1 << pShift) / p`
-10. `qShift = ceil(log2(q)) * 2`
-11. `qFactor = (1 << qShift) / q`
-
-Using these, construct your keypairs as follows. Each number should be in a string hexadecimal representation such as `"0xabc123"`.
-                
-        publicKey = PublicKey.newKey(e, n, bitLen, rrm, blockSize)
-        privateKey = PrivateKey.newKey(d, n, p, q, qModInvP, dp, dq, pShift, pFactor, qShift, qFactor)
-
-# Roadmap
-1. Consider implementing ECDSA encryption.
-2. Optimize further to make 1024 bit keys practical. Currently I am unsure of further ways to optimize the code.
-   - Probably the biggest opportunity is to reduce array allocations and calls to `list.add` and `list.remove`.
+It's possible this could change in the future as the game is developed. If you want to use this method, here are the steps to set it up:
+1. Obtain the correct encoded string by running the code `print(RsaEncode("your password here", publicKey))`
+2. Add the following logic to your `decode.bin`: `if encoded == "0xfakeEncodedPasswordString" then return "your password here"`
+3. Leave the original return statement in place as a fallback. This way, in case the developers make a change to the game that causes this method to be too slow (for example, by using it for more than just the password), your server at least won't be _completely_ bricked, and you can switch to a lower bit-size keypair.
+4. If your server has multiple possible users that may log in with different passwords (which is not advisable), you can add more hardcoded checks for the other passwords.
